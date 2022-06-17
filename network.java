@@ -1,3 +1,4 @@
+import java.util.*;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.ArrayList;
@@ -10,11 +11,13 @@ import java.util.Queue;
 
 
 public class network{
+		
 		public List <arc> neighbors;
 		public List<node> all_nodes;
 		public List<client> all_clients;
 		public Hashtable <node,List<arc>> network_map;
-		public Queue <packet[]> all_packets ;
+		public Dictionary<Double,packet> all_packets ;
+		public Dictionary<node, List<packet>> node_packet_requests;
 		int [] network_bound = new int [2];
 		int iteration;
 
@@ -22,8 +25,9 @@ public class network{
 			network_bound =xy;
 			all_nodes= nodes;
 			all_clients= clients;
-			//network_map = makeMap();
+			network_map = makeMap();
 			iteration=0;
+			all_packets = new Hashtable<Double,packet>();
 			
 			//Queue <packet[]> all_packets ;
 
@@ -44,56 +48,41 @@ public class network{
 
 			Iterator<node> node = all_nodes.iterator();
 			
-			
 			while(node.hasNext()) {
+				node Node= node.next();
+				Node.connected_devices.addAll(all_nodes);
+				Node.connected_devices.addAll(all_clients);
+				Node.connected_devices.remove(Node);
 				
-				node Node = node.next();
 				ArrayList<arc> Node_Arcs = new ArrayList<arc>();
 
-				for(client Client : all_clients) {
-					arc Node_Client = new arc(Node,Client);
-					Node_Arcs.add(Node_Client);
+				for(node Next : Node.connected_devices) {
+					arc Node_Node = new arc(Node,Next);
+					Node_Arcs.add(Node_Node);
 				}
-				
-				ArrayList<node> subNodeList=  (ArrayList<node>) all_nodes;
-				subNodeList.remove(Node);
-				
-				for(node Node2 : subNodeList) {
-					arc Node_Node = new arc(Node,Node2);
-					Node_Arcs.add(Node_Node);	
-				}
-				
 				network_map.put(Node, Node_Arcs);
+
 			}
-			
 			
 			
 			Iterator<client> client = all_clients.iterator();
-
-			
 			
 			while(client.hasNext()) {
 				client Client = client.next();
+				Client.connected_devices.addAll(all_nodes);
+				Client.connected_devices.addAll(all_clients);
+				Client.connected_devices.remove(Client);
 				
-				ArrayList<arc> Client_Arcs = new ArrayList<arc>();
+				ArrayList<arc> Node_Arcs = new ArrayList<arc>();
 
-				for(node Node : all_nodes) {
-					arc Client_Node = new arc(Client,Node);
-					Client_Arcs.add(Client_Node);
+				for(node Next : Client.connected_devices) {
+					arc Node_Node = new arc(Client,Next);
+					Node_Arcs.add(Node_Node);
 				}
-				
-				ArrayList<client> subClientList= (ArrayList<client>) all_clients;
-				subClientList.remove(Client);
-				
-				for(client Client2 : subClientList) {
-					arc Client_Client = new arc(Client,Client2);
-					Client_Arcs.add(Client_Client);
-				}
-				
-				network_map.put(Client, Client_Arcs);
+				network_map.put(Client, Node_Arcs);
+
 			}
 			
-
 				
 			return network_map;
 		}
@@ -102,6 +91,7 @@ public class network{
 		
 		public boolean finalStateReached() {
 // Check if any nodes have unsent packages. If all nodes have reached the end of their packet processing order, return false
+			
 			for(node Node : all_nodes) {
 				if(Node.hasPackets()) {
 					iteration++;
@@ -118,12 +108,14 @@ public class network{
 // Where all the next packet frame for all nodes are routed and then processed, meaning all packets have been sent to their next nodes.
 //Increment the network iterations count every time updateNodes is called.
 			for(node Node : all_nodes) {
-				if(Node.hasPackets() && Node.current_iteration==0) {
-					Node.startNode();
-				}else {
+				
+				if(Node.hasPackets()) {
+					
 					routeNextPacketFrame(Node);
 					Node.processPacketFrame();
+					Node.startNode();
 				}
+				
 			}
 			
 //	Unsure if to process by traversing the arcs or by node		
@@ -143,7 +135,16 @@ public class network{
 		
 		public void routeNextPacketFrame(node Node) {
 			
-			for(packet P : Node.packet_processing_order.get(Node.current_iteration)) {
+			List<packet> packets = Node.packet_processing_order.get(Node.current_iteration);
+			packet P= new packet();
+			while(packets!=null && !packets.isEmpty() ) {
+				P= packets.remove(0);
+				Object[] nextNode= getNextNode(Node,P,Node.current_iteration);
+				node next = (node) (nextNode[0]);
+				Double Epath_value= (Double) nextNode[1];
+				System.out.println("Send Packet size "+P.getSize()+" to "+next.coordinate[0]+","+next.coordinate[1]+" with estimted weight "+Epath_value );
+				P.addToPath(next);
+				all_packets.put(Epath_value, P);
 				//P.addToPath(getBestNextNode(Node, P));
 			}
 
@@ -153,33 +154,51 @@ public class network{
 // I think that Best Next Node can instead take a LinkedList of network path and build onto it using getNextNode
 // It can also be a singular recursive function as A* algorithms usually are instead of two overlapping methods
 //		
-//		public static node getBestNextNode(node initNode, packet P){
-//			
-//			if(initNode==P.startNode_endNode[1]) {
-//				return null;
-//			}
-//			
-//			double h = P.getPacketWeight();
-//			double g = initNode.getNodeCost(P, initNode.current_iteration);
-//			double f = h +g;
-//			double min_f = Integer.MAX_VALUE;
-//			node NextNode = initNode;
-//			for(node next : initNode.connected_devices) {
-//				//double next_f = getNextNode(next,initNode,P,1);
-//				if(next_f<min_f) {
-//					NextNode = next;
-//					min_f=next_f;
-//					
-//				}
-//			}
-//
-//			
-//			return NextNode;
-//			
-//		}
+		public static Object[] getNextNode(node initNode, packet P, int iter){
+			//System.out.print(".");
+
+			double h = P.getPacketWeight();
+			double g = initNode.getNodeCost(P, iter);
+			double f = h+g;
+		
+			if(initNode==P.startNode_endNode[1]) {
+				System.out.print("*");
+
+				Object[]node_weight= {initNode, f};
+				return node_weight;
+			}
+			
+			node NextNode= initNode;
+		
+			double min_f = Integer.MAX_VALUE;
+			ArrayList<node> nodes = (ArrayList<node>) initNode.connected_devices;
+			nodes.removeAll(P.getAllNodes());
+			
+			node next = new node();
+			
+			while(!nodes.isEmpty()) {
+				next = nodes.remove(0);
+				packet p = P;
+				p.addToPath(next);
+				//System.err.println("^");
+				Object[] next_f = getNextNode(next,p, iter+1);
+
+				node Node = (node) next_f[0];
+				double F = (double) next_f[1];
+				if(F < min_f) {
+					NextNode = Node;
+					min_f=F;
+					
+				}
+			}
+
+			Object[]node_weight= {NextNode, min_f};
+			return node_weight;
+			
+		}
 		
 		
-//		public static double getNextNode(node initNode, node previous, packet P, int step){
+//		public static double getNextNodeStep(node initNode, node previous, packet P, int step){
 //			
 //			if(initNode==P.startNode_endNode[1] | step >= initNode.connected_devices.size()/step ) {
 //				return initNode.getNodeCost(P, step);

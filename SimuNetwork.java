@@ -41,14 +41,17 @@ public class SimuNetwork {
 
 		switch(network_type) {
 		case 0: //linear map requires a rectangular graph
-			network_boundary[0]= input_values[0];
-			network_boundary[1]= input_values[0]*3;
+			network_boundary[0]= input_values[0]*3;
+			network_boundary[1]= input_values[0];
 		case 1: //clustered map requires a randomly sized graph
 			network_boundary[0]= input_values[0]*rand.nextInt(1, 3);
 			network_boundary[1]= input_values[0]*rand.nextInt(1, 3);
 		case 2: //even map requires a square graph
 			network_boundary[0]= input_values[0]*3;
 			network_boundary[1]= input_values[0]*3;
+		case 3://a randomLinear map needs a randomly sized graph
+			network_boundary[0]= input_values[0]*rand.nextInt(1, 3);
+			network_boundary[1]= input_values[0]*rand.nextInt(1, 3);
 		}
 
 
@@ -77,6 +80,8 @@ public class SimuNetwork {
 				for(int x =0; x <= input_values[n]; x++) {
 					coordinates.add(new int[] {rand.nextInt(1, network_boundary[0]+1), rand.nextInt(1,network_boundary[1]+1)});
 				}
+			case 3:
+				coordinates= randomLinear(network_boundary, input_values[n]);
 			}
 			
 			for(int i =0; i< input_values[n]-1; i++) {
@@ -97,7 +102,7 @@ public class SimuNetwork {
 		
 		//Begin by having each client request a random amount of packets from each node
 
-		ArrayList < List<packet>> client_requests = new ArrayList < List<packet>>();
+		ArrayList < ArrayList<packet>> client_requests = new ArrayList < ArrayList<packet>>();
 		
 		//= new PriorityQueue<packet>(new SortbyArrival());
 		for(client Client:currentNetwork.all_clients) {
@@ -108,48 +113,69 @@ public class SimuNetwork {
 		System.out.println(client_requests.size()+ " Packets Requested");
 		
 		
-		//Using a list of packet arrays , reorder the packets such that each node starts at the first packet request it receives
+//Using a list of packet arrays , add the packets to their nodes such that each node starts at the first packet request it receives
 		
 		List<packet> current_requests = new ArrayList<packet>();
-		List<node> current_nodes = new ArrayList<node>();
-		
-		int index= 0;
+		List<node> start_nodes = new ArrayList<node>();
+		Dictionary <node, List<packet>> node_requests = new Hashtable<node, List<packet>>();
+				
 		while(client_requests.size()!=0) {
-				
-			for(List<packet>client_request : client_requests) {
-				if(client_request.size()>0) {
-					packet P= client_request.remove(0);
-					
-					System.out.println("Client at "+P.startNode_endNode[1].coordinate[0]+","+P.startNode_endNode[1].coordinate[1]+" requested packet size "+P.packet_size+" from "+P.current_node.device_type +" at "+P.current_node.coordinate[0]+","+P.current_node.coordinate[1]);
-					
-					P.current_node.addPacket(P);
 
-// If the node hasn't been seen yet, add it to the list of running nodes 
-					if(!current_nodes.contains(P.current_node)) {
-						current_nodes.add(P.current_node);
-
-					}
-					current_requests.add(P);
-				}else {
-					
-					client_requests.remove(client_request);
-				}	
-				
+			ArrayList<packet> requests = client_requests.remove(0);
+			packet P= requests.remove(0);
+			//P.current_node.addPacket(P);
+			current_requests.add(P);
+			
+			System.out.println("Client at "+P.startNode_endNode[1].coordinate[0]+","+P.startNode_endNode[1].coordinate[1]+" requested packet size "+P.packet_size+" from "+P.current_node.device_type +" at "+P.current_node.coordinate[0]+","+P.current_node.coordinate[1]);
+			
+			if(!start_nodes.contains(P.current_node)) {
+// If the node hasn't been seen yet, add it to the list of running nodes
+				List <packet> node_packets = new ArrayList<packet>();
+				node_requests.put(P.current_node,node_packets);
+				start_nodes.add(P.current_node);
 			}
 			
-			index++;
+			if(node_requests.get(P.current_node)!=null) {
+				node_requests.get(P.current_node).add(P);
+			}
 			
-		}
-		
-		
+			
+			if(!requests.isEmpty()) {
+				client_requests.add(requests);
+			}else {
+			}
+			
+
+	}
 		
 		all_packets.add(current_requests);
 		
 		currentPackets=current_requests;
+		
+		for(node Node: start_nodes) {
+			while(node_requests.get(Node)!=null && !node_requests.get(Node).isEmpty()) {
+				packet P = node_requests.get(Node).remove(0);
+				Node.addPacket(P);
+			}
+			
+			
+			Node.startNode();
+		}
 
+		int iterations = 0;
 		
 		while(currentNetwork.finalStateReached()==false) {
+			
+			if(iterations>100) {
+				System.out.println("Final State not reached");
+				break;
+			}
+			
 			currentNetwork.updateNodes();
+			iterations++;
+			
+
+			
 		}
 		
 
@@ -165,16 +191,25 @@ public class SimuNetwork {
 	public List<int[]> linear(int[] boundary, int num){
 		List<int []> locations = new ArrayList<int []>(num);
 		
+		int x= rand.nextInt(1,boundary[0]+1);
+		int y= boundary[1] - rand.nextInt(1,boundary[1]+1);
+
+		locations.add(new int[] {x, y});
+		
 		for(int i=1; i<=num; i++) {
-			int y= boundary[1] * rand.nextInt(1,num);
+
+			x= rand.nextInt(1,boundary[0]+1);
+
 			
-			locations.add(new int[] {rand.nextInt(1,boundary[0]+1), y});
+			locations.add(new int[] {x, y});
 
 		}
 		
 		return locations;
 		
 	}
+	
+
 	
 
 	
@@ -217,6 +252,36 @@ public class SimuNetwork {
 		
 		return clusterPoints;
 	}
+	
+	public List<int[]> randomLinear(int[] boundary, int num){
+		List<int []> locations = new ArrayList<int []>(num);
+		
+		int x= rand.nextInt(1,boundary[0]+1);
+		int y= boundary[1] - rand.nextInt(1,boundary[1]+1);
+
+		locations.add(new int[] {x, y});
+		
+		for(int i=1; i<=num; i++) {
+			
+			switch(rand.nextInt(0,1)) {
+			case 0:
+				x= rand.nextInt(1,boundary[0]+1);
+			case 1:
+				y= boundary[1] - rand.nextInt(1,boundary[1]+1);
+
+			}
+			x= rand.nextInt(1,boundary[0]+1);
+			y= boundary[1] - rand.nextInt(1,boundary[1]+1);
+
+			
+			locations.add(new int[] {x, y});
+
+		}
+		
+		return locations;
+		
+	}
+	
 	
 	
 	
