@@ -10,31 +10,48 @@ public class packet{
 		double currentWeight;
 		double totalWeight;
 
+		public packet(Integer size) {
+			packet_size = size;
+		}
+		
+		
 		public packet(Integer size, node[] start_end) {
 			//LinkedList <arc> network_path; 
 			startNode_endNode = start_end;
 			packet_size = size;
 			current_node = startNode_endNode[0];
 			currentWeight= EuclidianDistance(start_end[0].coordinate, start_end[1].coordinate);
+			network_path= new LinkedList<arc>(); 
 			totalWeight=0;
 		}
 		
+		public packet() {
+			
+		}
+
+
 		public void setSize(Integer newSize) {
 			packet_size = newSize;
 		}
 		
 		public void addToPath(node next_node) {
 			
-			if(next_node.coordinate != current_node.coordinate) {
-				arc NextStop = new arc(current_node, next_node);
+			arc NextStop = new arc(current_node, next_node);
+			
+			current_node = next_node;
+
+			if(next_node.coordinate != startNode_endNode[1].coordinate) {
 				network_path.addLast(NextStop);
-				current_node = next_node;
+				currentWeight = getPacketWeight();
 			}else {
-				System.out.println("Destination Reached");
+				//System.out.println("Destination Reached");
 			}
 		}
 		
 		public double getPacketWeight(){
+			if(this.network_path.isEmpty()) {
+				return currentWeight;
+			}
 			int weight=0;
 			int i=0;
 			node Node;
@@ -49,6 +66,38 @@ public class packet{
 //			weight+= Node.getNodeCost(this, Node.getPacketIndex(this));
 			
 			return weight;
+		}
+		
+		public ArrayList<node> getAllNodes() {
+			ArrayList <node> nodes = new ArrayList<node> ();
+			node Node= current_node;
+			nodes.add(Node);
+			if(network_path.isEmpty()) {
+				return nodes;
+			}
+			for(arc Arc: network_path) {
+				Node = Arc.y;
+				if(!nodes.contains(Node))
+					nodes.add(Node);
+			}	
+			
+			return nodes;
+		}
+		
+		public Integer getSize() {
+			return packet_size;
+		}
+		
+		public node[] getStartEnd() {
+			return startNode_endNode;
+		}
+		
+		public LinkedList <arc> getPath(){
+			return network_path;
+		}
+		
+		public node getCurrentNode() {
+			return current_node;
 		}
 		
 		
