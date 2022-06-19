@@ -14,11 +14,8 @@ Project Debrief:
 
 
           Current State of Project:
-          successful in generating network nodes
-          line 119 of SimuNetwork.java throws a concurrent modification exception
-          line 55 of network.java [ makeMap() ] also throws a concurrent modification exception 
-          
-          Incomplete A* Pathing Algoritm methods in network:
-          routeNextPacketFrame(node); getNextBestNode(node, packet)
+          successful in generating network nodes and no errors returned with pre-set input values.
+          Returns null due to unshared memory
+          Returns out of bounds errors when Client<=Host<=Hub<=Radio<=Bridge
 
 
